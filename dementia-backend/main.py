@@ -4,9 +4,17 @@ from sklearn.preprocessing import StandardScaler, LabelEncoder
 import pandas as pd
 import numpy as np
 import joblib
+from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Replace "*" with your frontend's URL for security
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all methods (POST, GET, OPTIONS, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
 # Load Models
 ann_model = joblib.load("models/ann_model.pkl")
 label_encoder_gender = joblib.load("models/label_encoder_gender.pkl")  # Load fitted LabelEncoder
