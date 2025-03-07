@@ -11,7 +11,6 @@ app = FastAPI()
 ann_model = joblib.load("models/ann_model.pkl")
 label_encoder_gender = joblib.load("models/label_encoder_gender.pkl")  # Load fitted LabelEncoder
 scaler = joblib.load("models/scaler.pkl")  # Load trained StandardScaler
-# rfc_model = joblib.load("models/rfc_model.pkl")
 
 # Define Input Schema
 class PatientData(BaseModel):
