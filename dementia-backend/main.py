@@ -1,9 +1,13 @@
+# to run: uvicorn main:app --reload
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 import numpy as np
 import joblib
+import torch
+import pickle
+from models.grud_model import GRUD
 
 app = FastAPI()
 
@@ -30,6 +34,19 @@ rfe_mask = joblib.load("models/rfe_mask.pkl")
 
 # Load scaler
 scaler = joblib.load("models/scaler2.pkl")
+
+# GRU model
+# Load GRUD model and scaler
+grud_scaler = pickle.load(open("models/grud_scaler.pkl", "rb"))
+
+# GRUD model setup
+input_dim = 9
+hidden_dim = 32
+output_dim = 1
+grud_model = GRUD(input_dim, hidden_dim, output_dim)
+grud_model.load_state_dict(torch.load("models/grud_model.pt"))
+grud_model.eval()
+
 
 # Input schema
 class PatientData(BaseModel):
@@ -77,5 +94,43 @@ def predict(data: PatientData):
         "Random_Forest_Prediction": result_mapping[int(rfc_model.predict(input_scaled).item())],  # All features
         "Decision_Tree_Prediction": result_mapping[int(dectree_model.predict(input_scaled).item())]  # All features
     }
+
+    # ---------- GRUD Model Prediction ----------
+    # Convert to NumPy array
+    raw_input = np.array([[
+        0 if data.gender.upper() == "M" else 1,
+        data.age,
+        data.EDUC,
+        data.SES,
+        data.MMSE,
+        data.CDR,
+        data.eTIV,
+        data.nWBV,
+        data.ASF
+    ]], dtype=np.float32)
+
+    # Normalize (excluding gender)
+    norm_input = raw_input.copy()
+    norm_input[0, 1:] = grud_scaler.transform([raw_input[0, 1:]])[0]
+
+    # Create mask (1 where value is not NaN)
+    mask = (~np.isnan(norm_input)).astype(np.float32)
+
+    # Delta: 0 since one timestep
+    delta = np.zeros_like(norm_input, dtype=np.float32)
+
+    # Handle NaNs
+    norm_input = np.nan_to_num(norm_input)
+
+    # Convert to tensors
+    x_tensor = torch.tensor(norm_input).unsqueeze(0)    # (1, 1, 9)
+    mask_tensor = torch.tensor(mask).unsqueeze(0)       # (1, 1, 9)
+    delta_tensor = torch.tensor(delta).unsqueeze(0)     # (1, 1, 9)
+
+    with torch.no_grad():
+        grud_output = grud_model(x_tensor, mask_tensor, delta_tensor)
+        grud_pred = int((grud_output.item() > 0.5))  # Binary prediction
+
+    results["GRU_Prediction"] = result_mapping[grud_pred]
 
     return results

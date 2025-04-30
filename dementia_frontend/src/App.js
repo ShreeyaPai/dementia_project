@@ -14,23 +14,35 @@ const App = () => {
     ASF: ""
   });
 
+  const [selectedModel, setSelectedModel] = useState("ANN");
   const [prediction, setPrediction] = useState("");
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({ ...formData, [name]: value });
+    const numericFields = ["age", "EDUC", "SES", "MMSE", "CDR", "eTIV", "nWBV", "ASF"];
+    const parsedValue = numericFields.includes(name)
+      ? value === "" ? "" : parseFloat(value)
+      : value;
+
+    setFormData((prev) => ({ ...prev, [name]: parsedValue }));
+    setPrediction("");
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const handleModelChange = (e) => {
+    setSelectedModel(e.target.value);
+    setPrediction("");
+  };
+
+  const handleSubmit = async () => {
+    const payload = { ...formData, model_name: selectedModel };
 
     try {
       const response = await fetch("http://127.0.0.1:8000/predict/", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(payload)
       });
 
       if (!response.ok) {
@@ -38,9 +50,9 @@ const App = () => {
       }
 
       const data = await response.json();
-      setPrediction(data.ANN_Prediction);
-    } catch (error) {
-      console.error("Error:", error);
+      const predictionKey = `${selectedModel}_Prediction`;
+      setPrediction(data[predictionKey]);
+    } catch {
       setPrediction("Error fetching prediction");
     }
   };
@@ -48,12 +60,26 @@ const App = () => {
   return (
     <div className="background">
       <h2 className="page-title">
-    <span className="page-title">Dementia</span> 
-    <span className="page-title-2"> Detection</span>
-</h2>
+        <span className="page-title">Dementia</span>
+        <span className="page-title-2"> Detection</span>
+      </h2>
+
       <div className="container">
-        <form onSubmit={handleSubmit} className="medical-form">
-          
+        <div className="medical-form">
+          <div className="form-group full-width">
+            <label>Model</label>
+            <select value={selectedModel} onChange={handleModelChange}>
+              <option value="ANN">ANN</option>
+              <option value="KNN">KNN</option>
+              <option value="Logistic_Regression">Logistic Regression</option>
+              <option value="Naive_Bayes">Naive Bayes</option>
+              <option value="AdaBoost">AdaBoost</option>
+              <option value="Random_Forest">Random Forest</option>
+              <option value="Decision_Tree">Decision Tree</option>
+              <option value="GRU">GRU</option>
+            </select>
+          </div>
+
           <div className="form-group full-width">
             <label>Gender</label>
             <select name="gender" value={formData.gender} onChange={handleChange}>
@@ -62,52 +88,27 @@ const App = () => {
             </select>
           </div>
 
-          <div className="form-group">
-            <label>Age</label>
-            <input type="number" name="age" value={formData.age} onChange={handleChange} required />
-          </div>
+          {["age", "EDUC", "SES", "MMSE", "CDR", "eTIV", "nWBV", "ASF"].map((field) => (
+            <div key={field} className="form-group">
+              <label>{field}</label>
+              <input
+                type="number"
+                name={field}
+                value={formData[field]}
+                onChange={handleChange}
+                required
+              />
+            </div>
+          ))}
 
-          <div className="form-group">
-            <label>EDUC</label>
-            <input type="number" name="EDUC" value={formData.EDUC} onChange={handleChange} required />
-          </div>
-
-          <div className="form-group">
-            <label>SES</label>
-            <input type="number" name="SES" value={formData.SES} onChange={handleChange} required />
-          </div>
-
-          <div className="form-group">
-            <label>MMSE</label>
-            <input type="number" name="MMSE" value={formData.MMSE} onChange={handleChange} required />
-          </div>
-
-          <div className="form-group">
-            <label>CDR</label>
-            <input type="number" name="CDR" value={formData.CDR} onChange={handleChange} required />
-          </div>
-
-          <div className="form-group">
-            <label>eTIV</label>
-            <input type="number" name="eTIV" value={formData.eTIV} onChange={handleChange} required />
-          </div>
-
-          <div className="form-group">
-            <label>nWBV</label>
-            <input type="number" name="nWBV" value={formData.nWBV} onChange={handleChange} required />
-          </div>
-
-          <div className="form-group">
-            <label>ASF</label>
-            <input type="number" name="ASF" value={formData.ASF} onChange={handleChange} required />
-          </div>
-
-          <button type="submit" className="submit-btn">Detect</button>
-        </form>
+          <button type="button" className="submit-btn" onClick={handleSubmit}>
+            Detect
+          </button>
+        </div>
 
         {prediction && (
           <h3 className={`prediction-result ${prediction === "Non-Demented" ? "non-demented" : "demented"}`}>
-            {prediction}
+            {selectedModel} Prediction: {prediction}
           </h3>
         )}
       </div>
